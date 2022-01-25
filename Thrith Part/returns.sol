@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: MIT
 //Especificamos la version
-pragma solidity >=0.4.4 <0.7.0;
+pragma solidity >=0.4.4 <0.8.12;
 
 contract ValoresDeRetorno {
     //Funcion que nos devuelva un saludo
-    function saludos() public returns (string) {
+    function saludos() public pure returns (string memory) {
         return "saludos";
     }
 
     //Esta funcion calcula el resultado de una multiplicacion de dos numeros enteros
-    function Multiplicacion(uint256 _a, uint256 _b) public returns (uint256) {
+    function Multiplicacion(uint256 _a, uint256 _b)
+        public
+        pure
+        returns (uint256)
+    {
         return _a * _b;
     }
 
     //Esta funcion devuelve true si el numero es par y false en caso contrario
-    function par_impar(uint256 _a) public returns (bool) {
+    function par_impar(uint256 _a) public pure returns (bool) {
         bool flag;
 
         if (_a % 2 == 0) {
@@ -30,6 +34,7 @@ contract ValoresDeRetorno {
     // ademas de una variable booleana que es true si el residuo es 0 y false en caso contrario
     function division(uint256 _a, uint256 _b)
         public
+        pure
         returns (
             uint256,
             uint256,
@@ -51,6 +56,7 @@ contract ValoresDeRetorno {
 
     function numeros()
         public
+        pure
         returns (
             uint256,
             uint256,
@@ -65,7 +71,7 @@ contract ValoresDeRetorno {
 
     //Asignacion multiple
 
-    function todos_los_valores() public {
+    function todos_los_valores() public pure {
         //Declaramos las variables donde se guardan los valores de retorno de la funcion numeros()
         uint256 a;
         uint256 b;
@@ -77,7 +83,7 @@ contract ValoresDeRetorno {
         (a, b, c, d, e, f) = numeros();
     }
 
-    function ultimo_valor() public {
+    function ultimo_valor() public pure {
         (, , , , , uint256 ultimo) = numeros();
     }
 }

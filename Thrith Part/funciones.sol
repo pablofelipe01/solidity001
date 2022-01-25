@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //Indicamos la version
-pragma solidity >=0.4.4 <0.7.0;
+pragma solidity >=0.4.4 <0.8.12;
 pragma experimental ABIEncoderV2;
 
 contract funciones {
@@ -14,7 +14,7 @@ contract funciones {
     //Computar el hash de los datos propocionados como parametro
     bytes32 public hash;
 
-    function hash(string memory _datos) public {
+    function hash_5(string memory _datos) public {
         hash = keccak256(abi.encodePacked(_datos));
     }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //Indicamos la version
-pragma solidity >=0.4.4 <0.7.0;
+pragma solidity >=0.4.4 <0.8.12;
 pragma experimental ABIEncoderV2;
 
 contract view_pure_payable {
