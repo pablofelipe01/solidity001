@@ -27,4 +27,20 @@ contract bucle_for {
             }
         }
     }
+
+    function sumaFactorial() public pure returns (uint256) {
+        uint256 sumas = 0;
+
+        for (uint256 i = 1; i <= 10; i++) {
+            uint256 factorial = 1;
+
+            for (uint256 j = 2; j <= i; j++) {
+                factorial = factorial * j;
+            }
+
+            sumas = sumas + factorial;
+        }
+
+        return sumas;
+    }
 }
