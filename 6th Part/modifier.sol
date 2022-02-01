@@ -38,7 +38,7 @@ contract Modifier {
     function ejemplo2(string memory _nombre) public soloClientes(_nombre) {}
 
     modifier MayorEdad(uint256 _edadMinima, uint256 _edadUsuario) {
-        require(_edadUsuario > _edadMinima);
+        require(_edadUsuario >= _edadMinima);
         _;
     }
 
