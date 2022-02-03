@@ -12,54 +12,72 @@ pragma experimental ABIEncoderV2;
 //  Javier,19,56789W
 //  Pablo, 53,79454P
 
-contract votaciones {
+contract votacion {
+    //Direccion del propietario del contrato
     address owner;
-    uint256 empiezan_votaciones;
 
+    //constructor
     constructor() public {
         owner = msg.sender;
     }
 
+    //Relacion entre el nombre del candidato y el hash de sus datos personales
     mapping(string => bytes32) ID_Candidato;
+
+    //Relacion entre el nombre del candidato y el numero de votos
     mapping(string => uint256) votos_candidato;
 
+    //Lista para almacenar los nombres de los candidatos
     string[] candidatos;
 
+    //Lista de los hashes de la identidad de los votantes
     bytes32[] votantes;
 
+    //Cualquier persona puede usar esta funcion para presentarse a las elecciones
     function Representar(
-        string memory _nombreCandidato,
-        uint256 _edadCandidato,
-        string memory _idCandidato
+        string memory _nombrePersona,
+        uint256 _edadPersona,
+        string memory _idPersona
     ) public {
+        //Hash de los datos del candidato
         bytes32 hash_Candidato = keccak256(
-            abi.encodePacked(_nombreCandidato, _edadCandidato, _idCandidato)
+            abi.encodePacked(_nombrePersona, _edadPersona, _idPersona)
         );
 
-        ID_Candidato[_nombreCandidato] = hash_Candidato;
+        //Almacenamos el hash de los datos del candidato ligados a su nombre
+        ID_Candidato[_nombrePersona] = hash_Candidato;
 
-        candidatos.push(_nombreCandidato);
+        //Almacenamos el nombre del candidato
+        candidatos.push(_nombrePersona);
     }
 
+    //Permite visualizar las personas que se han presentado como candidatos a las votaciones
     function VerCandidatos() public view returns (string[] memory) {
+        //Devuelve la lista de los candidatos presentados
         return candidatos;
     }
 
+    //Los votantes van a poder votar
     function Votar(string memory _candidato) public {
+        //Hash de la direccion de la persona que ejecuta esta funcion
         bytes32 hash_Votante = keccak256(abi.encodePacked(msg.sender));
-
+        //Verificamos si el votante ya ha votado
         for (uint256 i = 0; i < votantes.length; i++) {
-            require(votantes[i] != hash_Votante, "Ya has votado");
+            require(votantes[i] != hash_Votante, "Ya has votado previamente");
         }
-
+        //Almacenamos el hash del votante dentro del array de votantes
         votantes.push(hash_Votante);
+        //Añadimos un voto al candidato seleccionado
         votos_candidato[_candidato]++;
     }
 
+    //Dado el nombre de un candidato nos devuelve el numero de votos que tiene
     function VerVotos(string memory _candidato) public view returns (uint256) {
+        //Devolviendo el numero de votos del candidato _candidato
         return votos_candidato[_candidato];
     }
 
+    //Funcion auxiliar que transforma un uint a un string
     function uint2str(uint256 _i)
         internal
         pure
@@ -83,30 +101,39 @@ contract votaciones {
         return string(bstr);
     }
 
+    //Ver los votos de cada uno de los candidatos
     function VerResultados() public view returns (string memory) {
+        //Guardamos en una variable string los candidatos con sus respectivos votos
         string memory resultados = "";
 
+        //Recorremos el array de candidatos para actualizar el string resultados
         for (uint256 i = 0; i < candidatos.length; i++) {
+            //Actualizamos el string resultados y añadimos el candidato que ocupa la posicion "i" del array candidatos
+            //y su numero de votos
             resultados = string(
                 abi.encodePacked(
                     resultados,
                     "(",
                     candidatos[i],
-                    ",",
+                    ", ",
                     uint2str(VerVotos(candidatos[i])),
                     ") -----"
                 )
             );
         }
 
+        //Devolvemos los resultados
         return resultados;
     }
 
+    //Proporcionar el nombre del candidato ganador
     function Ganador() public view returns (string memory) {
+        //La variable ganador contendra el nombre del candidato ganador
         string memory ganador = candidatos[0];
         bool flag;
 
-        for (uint256 i = 0; i < candidatos.length; i++) {
+        //Recorremos el array de candidatos para determinar el candidato con un numero de votos mayor
+        for (uint256 i = 1; i < candidatos.length; i++) {
             if (votos_candidato[ganador] < votos_candidato[candidatos[i]]) {
                 ganador = candidatos[i];
                 flag = false;
@@ -119,8 +146,8 @@ contract votaciones {
             }
         }
 
-        if (flag = true) {
-            ganador = "hay un empate";
+        if (flag == true) {
+            ganador = "Hay empate entre los candidatos!";
         }
         return ganador;
     }
