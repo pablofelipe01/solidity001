@@ -77,4 +77,62 @@ contract loteria {
     }
 
     // ----------------------------------------  LOTERIA ----------------------------------------
+
+    // Precio del boleto en Tokens
+    uint256 public PrecioBoleto = 5;
+    // Relacion entre la persona que compra los boletos y los numeros de los boletos
+    mapping(address => uint256[]) idPersona_boletos;
+    // Relacion necesaria para identificar al ganador
+    mapping(uint256 => address) ADN_boleto;
+    // Numero aleatorio
+    uint256 randNonce = 0;
+    // Boletos generados
+    uint256[] boletos_comprados;
+    // Eventos
+    event boleto_comprado(uint256, address); // Evento cuando se compra un boleto
+    event boleto_ganador(uint256); // Evento del ganador
+    event tokens_devueltos(uint256, address); // Evento para devolver tokens
+
+    function CompraBoleto(uint256 _boletos) public {
+        uint256 precio_total = _boletos * PrecioBoleto;
+        require(precio_total >= MisTokens(), "Necesitas mas tokens");
+        token.transferencia_loteria(msg.sender, owner, precio_total);
+        for (uint256 i = 0; i < _boletos; i++) {
+            uint256 random = uint256(
+                keccak256(abi.encodePacked(now, msg.sender, randNonce))
+            ) % 10000;
+            randNonce++;
+            idPersona_boletos[msg.sender].push(random);
+            boletos_comprados.push(random);
+            ADN_boleto[random] = msg.sender;
+            emit boleto_comprado(random, msg.sender);
+        }
+    }
+
+    function TusBoletos() public view returns (uint256[] memory) {
+        return idPersona_boletos[msg.sender];
+    }
+
+    function GeneraGanador() public Unicamente(msg.sender) {
+        require(boletos_comprados.length > 0, "No hay boletos comprados");
+        uint256 longitud = boletos_comprados.length;
+        uint256 posicion_array = uint256(
+            uint256(keccak256(abi.encodePacked(now))) % longitud
+        );
+        uint256 eleccion = boletos_comprados[posicion_array];
+        emit boleto_ganador(eleccion);
+        address direcion_ganador = ADN_boleto[eleccion];
+        token.transferencia_loteria(msg.sender, direcion_ganador, Bote());
+    }
+
+    function DevolverTokens(uint256 _numTokens) public payable {
+        require(_numTokens > 0, "No tienes tokens con nosotros");
+        require(
+            _numTokens <= MisTokens(),
+            "No tienes los tokens que desas devolver"
+        );
+        token.transferencia_loteria(msg.sender, address(this), _numTokens);
+        msg.sender.transfer(PrecioTokens(_numTokens));
+        emit tokens_devueltos(_numTokens, msg.sender);
+    }
 }
