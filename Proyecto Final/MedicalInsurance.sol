@@ -211,6 +211,41 @@ contract InsuranceFactory is OperacionesBasicas {
         require(ServicioEstado(_nombreServicio) == true, "Servicio no existe");
         return MappingServicios[_nombreServicio].precioTokensServicio;
     }
+
+    function ConsultarServiciosActivos() public view returns (string[] memory) {
+        string[] memory ServiciosActivos = new string[](nombreServicios.length);
+        uint256 contador = 0;
+        for (uint256 i = 0; i < nombreServicios.length; i++) {
+            if (ServicioEstado(nombreServicios[i]) == true) {
+                ServiciosActivos[contador] = nombreServicios[i];
+                contador++;
+            }
+        }
+        return ServiciosActivos;
+    }
+
+    function compraTokens(address _asegurado, uint256 _numTokens)
+        public
+        payable
+        UnicamenteAsegurados(_asegurado)
+    {
+        uint256 Balance = balanceOf();
+        require(_numTokens <= Balance, "No hay suficientes tokens");
+        require(_numTokens > 0, "el numero de tokens debe ser positivo");
+        token.transfer(msg.sender, _numTokens);
+        emit EventoComprado(_numTokens);
+    }
+
+    function balanceOf() public view returns (uint256 tokens) {
+        return (token.balanceOf(Insurance));
+    }
+
+    function generarTokens(uint256 _numTokens)
+        public
+        UnicamenteAseguradora(msg.sender)
+    {
+        token.increaseTotalSuply(_numTokens);
+    }
 }
 
 contract InsuranceHealthRecord is OperacionesBasicas {
@@ -260,6 +295,9 @@ contract InsuranceHealthRecord is OperacionesBasicas {
     ServiciosSolicitadosLab[] historialAseguradoLaboratorio;
 
     event EventoSelfDestruct(address);
+    event EventoDevolverTokens(address, uint256);
+    event EventoServicioPagado(address, string, uint256);
+    event EventoPeticionServicioLab(address, address, string);
 
     modifier Unicamente(address _direccion) {
         require(
@@ -300,6 +338,89 @@ contract InsuranceHealthRecord is OperacionesBasicas {
         emit EventoSelfDestruct(msg.sender);
         selfdestruct(msg.sender);
     }
+
+    function CompraTokens(uint256 _numTokens)
+        public
+        payable
+        Unicamente(msg.sender)
+    {
+        require(_numTokens > 0, "el numero de tokens debe ser positivo");
+        uint256 coste = calcularPrecioTokens(_numTokens);
+        require(msg.value >= coste, "No te alcanza");
+        uint256 returnValue = msg.value - coste;
+        msg.sender.transfer(returnValue);
+        InsuranceFactory(propietario.insurance).compraTokens(
+            msg.sender,
+            _numTokens
+        );
+    }
+
+    function balanceOf()
+        public
+        view
+        Unicamente(msg.sender)
+        returns (uint256 _balance)
+    {
+        return (propietario.tokens.balanceOf(address(this)));
+    }
+
+    function devolverTokens(uint256 _numTokens)
+        public
+        payable
+        Unicamente(msg.sender)
+    {
+        require(_numTokens > 0, "el numero de tokens debe ser positivo");
+        require(_numTokens <= balanceOf(), "No alcanza para devolver");
+        propietario.tokens.transfer(propietario.aseguradora, _numTokens);
+        msg.sender.transfer(calcularPrecioTokens(_numTokens));
+        emit EventoDevolverTokens(msg.sender, _numTokens);
+    }
+
+    function peticionServicio(string memory _servicio)
+        public
+        Unicamente(msg.sender)
+    {
+        require(
+            InsuranceFactory(propietario.insurance).ServicioEstado(_servicio) ==
+                true,
+            "No esta disponible este servicio"
+        );
+        uint256 pagoTokens = InsuranceFactory(propietario.insurance)
+            .getPrecioServicio(_servicio);
+        require(pagoTokens <= balanceOf(), "Saldo Insuficiente");
+        propietario.tokens.transfer(propietario.aseguradora, pagoTokens);
+        historialAsegurado[_servicio] = ServiciosSolicitados(
+            _servicio,
+            pagoTokens,
+            true
+        );
+        emit EventoServicioPagado(msg.sender, _servicio, pagoTokens);
+    }
+
+    function peticionServicioLab(address _direccionLab, string memory _servicio)
+        public
+        payable
+        Unicamente(msg.sender)
+    {
+        Laboratorio contratoLab = Laboratorio(_direccionLab);
+        require(
+            msg.value ==
+                contratoLab.ConsultarPrecioServicios(_servicio) * 1 ether,
+            "Operacion Invalida"
+        );
+        contratoLab.DarServicio(msg.sender, _servicio);
+        payable(contratoLab.DireccionLab()).transfer(
+            contratoLab.ConsultarPrecioServicios(_servicio) * 1 ether
+        );
+        historialAseguradoLaboratorio.push(
+            ServiciosSolicitadosLab(
+                _servicio,
+                contratoLab.ConsultarPrecioServicios(_servicio),
+                _direccionLab
+            )
+        );
+        emit EventoPeticionServicioLab(_direccionLab, msg.sender, _servicio);
+    }
 }
 
 contract Laboratorio is OperacionesBasicas {
@@ -311,5 +432,90 @@ contract Laboratorio is OperacionesBasicas {
     {
         DireccionLab = _account;
         contratoAseguradora = _direccionContratoAseguradora;
+    }
+
+    mapping(address => string) public ServicioSolicitado;
+
+    address[] public PeticionesServicios;
+
+    mapping(address => ResultadoServicio) ResultadosServicioLab;
+
+    struct ResultadoServicio {
+        string diagnostico_servicio;
+        string codigo_IPFS;
+    }
+
+    string[] nombreServiciosLab;
+
+    mapping(string => ServicioLab) public serviciosLab;
+
+    struct ServicioLab {
+        string nombreServicio;
+        uint256 precio;
+        bool enFuncionamiento;
+    }
+
+    event EventoServicioFuncionando(string, uint256);
+    event EventoDarServicio(address, string);
+
+    modifier UnicamenteLab(address _direccion) {
+        require(_direccion == DireccionLab, "No tiene Autorizacion");
+        _;
+    }
+
+    function NuevoServicioLab(string memory _servicio, uint256 _precio)
+        public
+        UnicamenteLab(msg.sender)
+    {
+        serviciosLab[_servicio] = ServicioLab(_servicio, _precio, true);
+        nombreServiciosLab.push(_servicio);
+        emit EventoServicioFuncionando(_servicio, _precio);
+    }
+
+    function ConsultarServicios() public view returns (string[] memory) {
+        return nombreServiciosLab;
+    }
+
+    function ConsultarPrecioServicios(string memory _servicio)
+        public
+        view
+        returns (uint256)
+    {
+        return serviciosLab[_servicio].precio;
+    }
+
+    function DarServicio(address _direccionAsegurado, string memory _servicio)
+        public
+    {
+        InsuranceFactory IF = InsuranceFactory(contratoAseguradora);
+        IF.FuncionUnicamenteAsegurados(_direccionAsegurado);
+        require(
+            serviciosLab[_servicio].enFuncionamiento == true,
+            "Fuera de servicio"
+        );
+        ServicioSolicitado[_direccionAsegurado] = _servicio;
+        PeticionesServicios.push(_direccionAsegurado);
+        emit EventoDarServicio(_direccionAsegurado, _servicio);
+    }
+
+    function DarResultados(
+        address _direccionAsegurado,
+        string memory _diagnostico,
+        string memory _codigoIPFS
+    ) public UnicamenteLab(msg.sender) {
+        ResultadosServicioLab[_direccionAsegurado] = ResultadoServicio(
+            _diagnostico,
+            _codigoIPFS
+        );
+    }
+
+    function VisualizacionResultados(address _direccionAsegurado)
+        public
+        view
+        returns (string memory _diagnostico, string memory _codigoIPFS)
+    {
+        _diagnostico = ResultadosServicioLab[_direccionAsegurado]
+            .diagnostico_servicio;
+        _codigoIPFS = ResultadosServicioLab[_direccionAsegurado].codigo_IPFS;
     }
 }
