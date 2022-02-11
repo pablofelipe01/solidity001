@@ -120,6 +120,97 @@ contract InsuranceFactory is OperacionesBasicas {
     {
         return DireccionesAsegurados;
     }
+
+    function consultaHistorialAsegurado(
+        address _direccionAsegurado,
+        address _direccionConsultor
+    )
+        public
+        view
+        Asegurado_o_Aseguradora(_direccionAsegurado, _direccionConsultor)
+        returns (string memory)
+    {
+        string memory historial = "";
+        address _direccionContratoAsegurado = MappingAsegurados[
+            _direccionAsegurado
+        ].DireccionContrato;
+        for (uint256 i = 0; i < nombreServicios.length; i++) {
+            if (
+                MappingServicios[nombreServicios[i]].EstadoServicio &&
+                InsuranceHealthRecord(_direccionContratoAsegurado)
+                    .ServicioEstadoAsegurado(nombreServicios[i]) ==
+                true
+            ) {
+                (
+                    string memory nombreServicio,
+                    uint256 precioSevicio
+                ) = InsuranceHealthRecord(_direccionContratoAsegurado)
+                        .HistorialAsegurado(nombreServicios[i]);
+
+                historial = string(
+                    abi.encodePacked(
+                        historial,
+                        "(",
+                        nombreServicio,
+                        ", ",
+                        uint2str(precioSevicio),
+                        ") ____"
+                    )
+                );
+            }
+        }
+        return historial;
+    }
+
+    function darBajaCliente(address _direccionAsegurado)
+        public
+        UnicamenteAseguradora(msg.sender)
+    {
+        MappingAsegurados[_direccionAsegurado].AutorizacionCliente = false;
+        InsuranceHealthRecord(
+            MappingAsegurados[_direccionAsegurado].DireccionContrato
+        ).darBaja;
+        emit EventoBajaAsegurado(_direccionAsegurado);
+    }
+
+    function nuevoServicio(
+        string memory _nombreServicio,
+        uint256 _precioServicio
+    ) public UnicamenteAseguradora(msg.sender) {
+        MappingServicios[_nombreServicio] = servicio(
+            _nombreServicio,
+            _precioServicio,
+            true
+        );
+        nombreServicios.push(_nombreServicio);
+        emit EventoNuevoServicio(_nombreServicio, _precioServicio);
+    }
+
+    function darBajaServicio(string memory _nombreServicio)
+        public
+        UnicamenteAseguradora(msg.sender)
+    {
+        require(ServicioEstado(_nombreServicio) == true, "Servicio no existe");
+        MappingServicios[_nombreServicio].EstadoServicio = false;
+        emit EventoBajaServicio(_nombreServicio);
+    }
+
+    function ServicioEstado(string memory _nombreServicio)
+        public
+        view
+        returns (bool)
+    {
+        return MappingServicios[_nombreServicio].EstadoServicio;
+    }
+
+    function getPrecioServicio(string memory _nombreServicio)
+        public
+        view
+        returns (uint256 tokens)
+    {
+        require(ServicioEstado(_nombreServicio) == true, "Servicio no existe");
+        return MappingServicios[_nombreServicio].precioTokensServicio;
+    }
 }
 
 contract InsuranceHealthRecord is OperacionesBasicas {
@@ -168,12 +259,46 @@ contract InsuranceHealthRecord is OperacionesBasicas {
     mapping(string => ServiciosSolicitados) historialAsegurado;
     ServiciosSolicitadosLab[] historialAseguradoLaboratorio;
 
+    event EventoSelfDestruct(address);
+
+    modifier Unicamente(address _direccion) {
+        require(
+            _direccion == propietario.direccionPropietario,
+            "No es el asegurado"
+        );
+        _;
+    }
+
     function HistorialAseguradoLaboratorio()
         public
         view
         returns (ServiciosSolicitadosLab[] memory)
     {
         return historialAseguradoLaboratorio;
+    }
+
+    function HistorialAsegurado(string memory _servicio)
+        public
+        view
+        returns (string memory nombreServicio, uint256 precioSevicio)
+    {
+        return (
+            historialAsegurado[_servicio].nombreServicio,
+            historialAsegurado[_servicio].precioSevicio
+        );
+    }
+
+    function ServicioEstadoAsegurado(string memory _servicio)
+        public
+        view
+        returns (bool)
+    {
+        return historialAsegurado[_servicio].estadoServicio;
+    }
+
+    function darBaja() public Unicamente(msg.sender) {
+        emit EventoSelfDestruct(msg.sender);
+        selfdestruct(msg.sender);
     }
 }
 
